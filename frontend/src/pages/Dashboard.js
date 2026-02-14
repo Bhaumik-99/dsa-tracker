@@ -1,15 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
-import { 
-  Flame, 
-  Target, 
-  Trophy, 
-  Clock, 
-  ExternalLink, 
+import {
+  Flame,
+  Target,
+  Trophy,
+  Clock,
+  ExternalLink,
   Check,
   AlertCircle,
-  BookOpen
+  BookOpen,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 
@@ -48,19 +48,31 @@ const getDifficultyClass = (difficulty) => {
 
 const Dashboard = () => {
   const { token, refreshUser } = useAuth();
+
   const [revisions, setRevisions] = useState([]);
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [markingId, setMarkingId] = useState(null);
 
-  const fetchData = async () => {
+  /**
+   * ✅ Stable fetch function (fixes ESLint dependency issue)
+   */
+  const loadDashboard = useCallback(async () => {
     try {
-      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      
+      setLoading(true);
+
+      const timezone =
+        Intl.DateTimeFormat().resolvedOptions().timeZone;
+
       const [revisionsRes, analyticsRes] = await Promise.all([
-        fetch(`${API_URL}/api/revisions/today?timezone_str=${encodeURIComponent(timezone)}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
+        fetch(
+          `${API_URL}/api/revisions/today?timezone_str=${encodeURIComponent(
+            timezone
+          )}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        ),
         fetch(`${API_URL}/api/analytics`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
@@ -81,27 +93,39 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchData();
   }, [token]);
 
+  /**
+   * ✅ Runs when token changes
+   */
+  useEffect(() => {
+    if (token) {
+      loadDashboard();
+    }
+  }, [token, loadDashboard]);
+
+  /**
+   * ✅ Mark revision
+   */
   const markRevised = async (problemId, stage) => {
     setMarkingId(problemId);
+
     try {
-      const response = await fetch(`${API_URL}/api/revise/${problemId}`, {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ revision_stage: stage }),
-      });
+      const response = await fetch(
+        `${API_URL}/api/revise/${problemId}`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ revision_stage: stage }),
+        }
+      );
 
       if (response.ok) {
         toast.success("Revision marked complete!");
-        fetchData();
+        await loadDashboard(); // ✅ refresh dashboard safely
         refreshUser();
       } else {
         const error = await response.json();
@@ -134,63 +158,16 @@ const Dashboard = () => {
         </p>
       </div>
 
-      {/* Stats Grid - Bento Style */}
+      {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {/* Streak */}
-        <div className="glass rounded-xl p-5 card-interactive" data-testid="stat-streak">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
-              <Flame className="text-amber-400" size={20} />
-            </div>
-          </div>
-          <p className="font-mono text-3xl font-bold text-zinc-100">
-            {analytics?.streak || 0}
-          </p>
-          <p className="text-sm text-zinc-500 mt-1">Day Streak</p>
-        </div>
-
-        {/* Due Today */}
-        <div className="glass rounded-xl p-5 card-interactive" data-testid="stat-due-today">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-lg bg-violet-500/10 flex items-center justify-center">
-              <Clock className="text-violet-400" size={20} />
-            </div>
-          </div>
-          <p className="font-mono text-3xl font-bold text-zinc-100">
-            {analytics?.due_today || 0}
-          </p>
-          <p className="text-sm text-zinc-500 mt-1">Due Today</p>
-        </div>
-
-        {/* Total Problems */}
-        <div className="glass rounded-xl p-5 card-interactive" data-testid="stat-total">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-              <Target className="text-emerald-400" size={20} />
-            </div>
-          </div>
-          <p className="font-mono text-3xl font-bold text-zinc-100">
-            {analytics?.total_problems || 0}
-          </p>
-          <p className="text-sm text-zinc-500 mt-1">Total Problems</p>
-        </div>
-
-        {/* Mastered */}
-        <div className="glass rounded-xl p-5 card-interactive" data-testid="stat-mastered">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-lg bg-cyan-500/10 flex items-center justify-center">
-              <Trophy className="text-cyan-400" size={20} />
-            </div>
-          </div>
-          <p className="font-mono text-3xl font-bold text-zinc-100">
-            {analytics?.mastered_count || 0}
-          </p>
-          <p className="text-sm text-zinc-500 mt-1">Mastered</p>
-        </div>
+        <StatCard icon={<Flame />} value={analytics?.streak || 0} label="Day Streak" color="amber" />
+        <StatCard icon={<Clock />} value={analytics?.due_today || 0} label="Due Today" color="violet" />
+        <StatCard icon={<Target />} value={analytics?.total_problems || 0} label="Total Problems" color="emerald" />
+        <StatCard icon={<Trophy />} value={analytics?.mastered_count || 0} label="Mastered" color="cyan" />
       </div>
 
-      {/* Today's Revisions */}
-      <div className="glass rounded-xl overflow-hidden" data-testid="revisions-section">
+      {/* Revisions Section */}
+      <div className="glass rounded-xl overflow-hidden">
         <div className="p-5 border-b border-zinc-800/50">
           <h2 className="font-heading text-xl font-semibold text-zinc-100 flex items-center gap-2">
             <Clock size={20} className="text-violet-400" />
@@ -200,84 +177,52 @@ const Dashboard = () => {
 
         {revisions.length === 0 ? (
           <div className="p-12 text-center">
-            <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
-              <Trophy className="text-emerald-400" size={28} />
-            </div>
-            <h3 className="font-heading text-lg font-semibold text-zinc-100 mb-2">
+            <Trophy className="text-emerald-400 mx-auto mb-4" size={28} />
+            <h3 className="font-heading text-lg font-semibold text-zinc-100">
               All caught up!
             </h3>
             <p className="text-zinc-500">
-              No revisions due today. Great job staying on track!
+              No revisions due today.
             </p>
           </div>
         ) : (
           <div className="divide-y divide-zinc-800/50">
-            {revisions.map((problem, index) => (
-              <div
-                key={`${problem.id}-${problem.revision_stage}`}
-                className={`p-5 hover:bg-zinc-800/30 transition-colors ${
-                  problem.is_overdue ? "bg-rose-500/5" : ""
-                }`}
-                style={{ animationDelay: `${index * 50}ms` }}
-                data-testid={`revision-card-${problem.id}`}
-              >
-                <div className="flex flex-col md:flex-row md:items-center gap-4">
-                  {/* Problem info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-2">
-                      <h3 className="font-medium text-zinc-100 truncate">
-                        {problem.title}
-                      </h3>
-                      {problem.is_leetcode && (
-                        <span className="leetcode-badge">LeetCode</span>
-                      )}
-                      {problem.is_overdue && (
-                        <span className="inline-flex items-center gap-1 text-xs text-rose-400">
-                          <AlertCircle size={12} />
-                          Overdue
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium font-mono border ${getRevisionBadgeClass(problem.revision_stage)}`}>
+            {revisions.map((problem) => (
+              <div key={`${problem.id}-${problem.revision_stage}`} className="p-5">
+                <div className="flex justify-between flex-wrap gap-4">
+                  <div>
+                    <h3 className="text-zinc-100">{problem.title}</h3>
+
+                    <div className="flex gap-2 mt-2 flex-wrap">
+                      <span className={`px-2 py-1 text-xs border rounded ${getRevisionBadgeClass(problem.revision_stage)}`}>
                         {getRevisionLabel(problem.revision_stage)}
                       </span>
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium font-mono border ${getDifficultyClass(problem.difficulty)}`}>
+
+                      <span className={`px-2 py-1 text-xs border rounded ${getDifficultyClass(problem.difficulty)}`}>
                         {problem.difficulty}
-                      </span>
-                      <span className="text-xs text-zinc-500 font-mono">
-                        {problem.pattern}
                       </span>
                     </div>
                   </div>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-2">
+                  <div className="flex gap-2">
                     <Button
-                      variant="outline"
                       size="sm"
+                      variant="outline"
                       onClick={() => window.open(problem.link, "_blank")}
-                      data-testid={`open-problem-${problem.id}`}
-                      className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
                     >
-                      <ExternalLink size={14} className="mr-1.5" />
+                      <ExternalLink size={14} className="mr-1" />
                       Open
                     </Button>
+
                     <Button
                       size="sm"
-                      onClick={() => markRevised(problem.id, problem.revision_stage)}
+                      onClick={() =>
+                        markRevised(problem.id, problem.revision_stage)
+                      }
                       disabled={markingId === problem.id}
-                      data-testid={`mark-revised-${problem.id}`}
-                      className="bg-violet-600 hover:bg-violet-700 text-white"
                     >
-                      {markingId === problem.id ? (
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      ) : (
-                        <>
-                          <Check size={14} className="mr-1.5" />
-                          Mark Revised
-                        </>
-                      )}
+                      <Check size={14} className="mr-1" />
+                      Mark Revised
                     </Button>
                   </div>
                 </div>
@@ -287,22 +232,15 @@ const Dashboard = () => {
         )}
       </div>
 
-      {/* Empty state prompt */}
       {analytics?.total_problems === 0 && (
-        <div className="glass rounded-xl p-8 text-center" data-testid="empty-state">
-          <div className="w-16 h-16 rounded-full bg-violet-500/10 flex items-center justify-center mx-auto mb-4">
-            <BookOpen className="text-violet-400" size={28} />
-          </div>
-          <h3 className="font-heading text-lg font-semibold text-zinc-100 mb-2">
+        <div className="glass rounded-xl p-8 text-center">
+          <BookOpen className="text-violet-400 mx-auto mb-4" size={28} />
+          <h3 className="text-zinc-100 font-semibold">
             Start your DSA journey
           </h3>
-          <p className="text-zinc-500 mb-4">
-            Add your first problem to begin tracking revisions
-          </p>
           <Button
-            onClick={() => window.location.href = "/add"}
-            data-testid="add-first-problem"
-            className="bg-violet-600 hover:bg-violet-700 text-white"
+            className="mt-4"
+            onClick={() => (window.location.href = "/add")}
           >
             Add Your First Problem
           </Button>
@@ -311,5 +249,18 @@ const Dashboard = () => {
     </div>
   );
 };
+
+/**
+ * Small reusable stat component (cleaner UI)
+ */
+const StatCard = ({ icon, value, label }) => (
+  <div className="glass rounded-xl p-5">
+    <div className="mb-3">{icon}</div>
+    <p className="font-mono text-3xl font-bold text-zinc-100">
+      {value}
+    </p>
+    <p className="text-sm text-zinc-500">{label}</p>
+  </div>
+);
 
 export default Dashboard;
