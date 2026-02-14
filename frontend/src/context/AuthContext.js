@@ -12,11 +12,27 @@ export const useAuth = () => {
   return context;
 };
 
+/**
+ * ✅ SAFE JSON PARSER
+ * Prevents: "body stream already read"
+ * Handles empty / non-JSON responses safely
+ */
+const safeJson = async (response) => {
+  try {
+    return await response.json();
+  } catch {
+    return {};
+  }
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem("token"));
   const [loading, setLoading] = useState(true);
 
+  /**
+   * ✅ Verify token on app load
+   */
   useEffect(() => {
     const verifyToken = async () => {
       if (!token) {
@@ -32,18 +48,14 @@ export const AuthProvider = ({ children }) => {
         });
 
         if (response.ok) {
-          const userData = await response.json();
+          const userData = await safeJson(response);
           setUser(userData);
         } else {
-          localStorage.removeItem("token");
-          setToken(null);
-          setUser(null);
+          logout();
         }
       } catch (error) {
         console.error("Token verification failed:", error);
-        localStorage.removeItem("token");
-        setToken(null);
-        setUser(null);
+        logout();
       } finally {
         setLoading(false);
       }
@@ -52,6 +64,9 @@ export const AuthProvider = ({ children }) => {
     verifyToken();
   }, [token]);
 
+  /**
+   * ✅ LOGIN
+   */
   const login = async (email, password) => {
     const response = await fetch(`${API_URL}/api/auth/login`, {
       method: "POST",
@@ -61,7 +76,7 @@ export const AuthProvider = ({ children }) => {
       body: JSON.stringify({ email, password }),
     });
 
-    const data = await response.json();
+    const data = await safeJson(response);
 
     if (!response.ok) {
       throw new Error(data.detail || "Login failed");
@@ -70,9 +85,13 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem("token", data.access_token);
     setToken(data.access_token);
     setUser(data.user);
+
     return data;
   };
 
+  /**
+   * ✅ REGISTER
+   */
   const register = async (name, email, password) => {
     const response = await fetch(`${API_URL}/api/auth/register`, {
       method: "POST",
@@ -82,7 +101,7 @@ export const AuthProvider = ({ children }) => {
       body: JSON.stringify({ name, email, password }),
     });
 
-    const data = await response.json();
+    const data = await safeJson(response);
 
     if (!response.ok) {
       throw new Error(data.detail || "Registration failed");
@@ -91,18 +110,25 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem("token", data.access_token);
     setToken(data.access_token);
     setUser(data.user);
+
     return data;
   };
 
+  /**
+   * ✅ LOGOUT
+   */
   const logout = () => {
     localStorage.removeItem("token");
     setToken(null);
     setUser(null);
   };
 
+  /**
+   * ✅ Refresh user data
+   */
   const refreshUser = async () => {
     if (!token) return;
-    
+
     try {
       const response = await fetch(`${API_URL}/api/auth/me`, {
         headers: {
@@ -111,7 +137,7 @@ export const AuthProvider = ({ children }) => {
       });
 
       if (response.ok) {
-        const userData = await response.json();
+        const userData = await safeJson(response);
         setUser(userData);
       }
     } catch (error) {
@@ -120,7 +146,17 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, refreshUser }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        loading,
+        login,
+        register,
+        logout,
+        refreshUser,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
