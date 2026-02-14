@@ -40,7 +40,9 @@ const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-3 shadow-xl">
-        <p className="text-zinc-100 font-medium text-sm">{label || payload[0].name}</p>
+        <p className="text-zinc-100 font-medium text-sm">
+          {payload[0].payload.name || label}
+        </p>
         <p className="text-violet-400 font-mono text-lg">
           {payload[0].value} problem{payload[0].value !== 1 ? 's' : ''}
         </p>
@@ -214,10 +216,17 @@ const Analytics = () => {
                   <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(139, 92, 246, 0.1)' }} />
                   <Bar 
                     dataKey="count" 
-                    fill="#8b5cf6" 
                     radius={[0, 4, 4, 0]}
                     maxBarSize={24}
-                  />
+                  >
+                    {/* FIXED: Dynamic color mapping for bars */}
+                    {analytics.pattern_distribution.map((entry, index) => (
+                      <Cell 
+                        key={`cell-${index}`} 
+                        fill={PATTERN_COLORS[index % PATTERN_COLORS.length]} 
+                      />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
