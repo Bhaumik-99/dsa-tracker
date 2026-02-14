@@ -219,7 +219,6 @@ const Analytics = () => {
                     radius={[0, 4, 4, 0]}
                     maxBarSize={24}
                   >
-                    {/* FIXED: Dynamic color mapping for bars */}
                     {analytics.pattern_distribution.map((entry, index) => (
                       <Cell 
                         key={`cell-${index}`} 
@@ -258,13 +257,16 @@ const Analytics = () => {
                     dataKey="count"
                     nameKey="name"
                   >
-                    {analytics.difficulty_distribution.map((entry) => (
-                      <Cell 
-                        key={entry.name} 
-                        fill={DIFFICULTY_COLORS[entry.name]} 
-                        stroke="transparent"
-                      />
-                    ))}
+                    {/* FIXED: Filter data first, then map colors to names explicitly */}
+                    {analytics.difficulty_distribution
+                      .filter(d => d.count > 0)
+                      .map((entry) => (
+                        <Cell 
+                          key={`cell-${entry.name}`} 
+                          fill={DIFFICULTY_COLORS[entry.name]} 
+                          stroke="transparent"
+                        />
+                      ))}
                   </Pie>
                   <Tooltip content={<CustomTooltip />} />
                 </PieChart>
