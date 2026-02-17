@@ -8,7 +8,6 @@ import {
   Clock,
   ExternalLink,
   Check,
-  AlertCircle,
   BookOpen,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
@@ -55,15 +54,15 @@ const Dashboard = () => {
   const [markingId, setMarkingId] = useState(null);
 
   /**
-   * ✅ Stable fetch function (fixes ESLint dependency issue)
+   * ✅ Stable fetch function
    */
   const loadDashboard = useCallback(async () => {
     try {
       setLoading(true);
 
-      const timezone =
-        Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
+      // Passing timezone to BOTH endpoints now
       const [revisionsRes, analyticsRes] = await Promise.all([
         fetch(
           `${API_URL}/api/revisions/today?timezone_str=${encodeURIComponent(
@@ -73,9 +72,14 @@ const Dashboard = () => {
             headers: { Authorization: `Bearer ${token}` },
           }
         ),
-        fetch(`${API_URL}/api/analytics`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
+        fetch(
+          `${API_URL}/api/analytics?timezone_str=${encodeURIComponent(
+            timezone
+          )}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        ),
       ]);
 
       if (revisionsRes.ok) {
@@ -111,17 +115,14 @@ const Dashboard = () => {
     setMarkingId(problemId);
 
     try {
-      const response = await fetch(
-        `${API_URL}/api/revise/${problemId}`,
-        {
-          method: "PATCH",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ revision_stage: stage }),
-        }
-      );
+      const response = await fetch(`${API_URL}/api/revise/${problemId}`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ revision_stage: stage }),
+      });
 
       if (response.ok) {
         toast.success("Revision marked complete!");
@@ -160,10 +161,30 @@ const Dashboard = () => {
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard icon={<Flame />} value={analytics?.streak || 0} label="Day Streak" color="amber" />
-        <StatCard icon={<Clock />} value={analytics?.due_today || 0} label="Due Today" color="violet" />
-        <StatCard icon={<Target />} value={analytics?.total_problems || 0} label="Total Problems" color="emerald" />
-        <StatCard icon={<Trophy />} value={analytics?.mastered_count || 0} label="Mastered" color="cyan" />
+        <StatCard
+          icon={<Flame />}
+          value={analytics?.streak || 0}
+          label="Day Streak"
+          color="amber"
+        />
+        <StatCard
+          icon={<Clock />}
+          value={analytics?.due_today || 0}
+          label="Due Today"
+          color="violet"
+        />
+        <StatCard
+          icon={<Target />}
+          value={analytics?.total_problems || 0}
+          label="Total Problems"
+          color="emerald"
+        />
+        <StatCard
+          icon={<Trophy />}
+          value={analytics?.mastered_count || 0}
+          label="Mastered"
+          color="cyan"
+        />
       </div>
 
       {/* Revisions Section */}
@@ -181,26 +202,41 @@ const Dashboard = () => {
             <h3 className="font-heading text-lg font-semibold text-zinc-100">
               All caught up!
             </h3>
-            <p className="text-zinc-500">
-              No revisions due today.
-            </p>
+            <p className="text-zinc-500">No revisions due today.</p>
           </div>
         ) : (
           <div className="divide-y divide-zinc-800/50">
             {revisions.map((problem) => (
-              <div key={`${problem.id}-${problem.revision_stage}`} className="p-5">
+              <div
+                key={`${problem.id}-${problem.revision_stage}`}
+                className="p-5"
+              >
                 <div className="flex justify-between flex-wrap gap-4">
                   <div>
                     <h3 className="text-zinc-100">{problem.title}</h3>
 
                     <div className="flex gap-2 mt-2 flex-wrap">
-                      <span className={`px-2 py-1 text-xs border rounded ${getRevisionBadgeClass(problem.revision_stage)}`}>
+                      <span
+                        className={`px-2 py-1 text-xs border rounded ${getRevisionBadgeClass(
+                          problem.revision_stage
+                        )}`}
+                      >
                         {getRevisionLabel(problem.revision_stage)}
                       </span>
 
-                      <span className={`px-2 py-1 text-xs border rounded ${getDifficultyClass(problem.difficulty)}`}>
+                      <span
+                        className={`px-2 py-1 text-xs border rounded ${getDifficultyClass(
+                          problem.difficulty
+                        )}`}
+                      >
                         {problem.difficulty}
                       </span>
+                      
+                      {problem.is_overdue && (
+                        <span className="px-2 py-1 text-xs border rounded bg-red-900/30 text-red-400 border-red-800/50">
+                          Overdue
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -251,14 +287,12 @@ const Dashboard = () => {
 };
 
 /**
- * Small reusable stat component (cleaner UI)
+ * Small reusable stat component
  */
 const StatCard = ({ icon, value, label }) => (
   <div className="glass rounded-xl p-5">
     <div className="mb-3">{icon}</div>
-    <p className="font-mono text-3xl font-bold text-zinc-100">
-      {value}
-    </p>
+    <p className="font-mono text-3xl font-bold text-zinc-100">{value}</p>
     <p className="text-sm text-zinc-500">{label}</p>
   </div>
 );
