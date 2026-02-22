@@ -115,13 +115,20 @@ const Dashboard = () => {
     setMarkingId(problemId);
 
     try {
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const localCompletedAt = new Date().toISOString();
+
       const response = await fetch(`${API_URL}/api/revise/${problemId}`, {
         method: "PATCH",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ revision_stage: stage }),
+        body: JSON.stringify({ 
+          revision_stage: stage,
+          completed_at: localCompletedAt,
+          timezone_str: timezone
+        }),
       });
 
       if (response.ok) {
