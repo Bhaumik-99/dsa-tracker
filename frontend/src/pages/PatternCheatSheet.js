@@ -1,14 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
-import {
-  PlusCircle,
-  ChevronDown,
-  Pencil,
-  Save,
-  BookOpen,
-  FileText,
-} from "lucide-react";
+import { PlusCircle, BookOpen, FileText } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -20,7 +13,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from "../components/ui/dialog";
-import { cn } from "../lib/utils";
 import PatternDescriptionModal from "../components/PatternDescriptionModal";
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -29,13 +21,8 @@ const PatternCheatSheet = () => {
   const { token } = useAuth();
   const [patterns, setPatterns] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activePatternId, setActivePatternId] = useState(null);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [selectedPattern, setSelectedPattern] = useState(null);
-  const [editingNotesId, setEditingNotesId] = useState(null);
-  const [editNotesValue, setEditNotesValue] = useState("");
-  const [savingNotesId, setSavingNotesId] = useState(null);
-  const cardRefs = useRef({});
 
   const loadPatterns = useCallback(async () => {
     if (!token) return;
@@ -62,42 +49,8 @@ const PatternCheatSheet = () => {
     loadPatterns();
   }, [loadPatterns]);
 
-  const toggleCard = (id) => {
-    setActivePatternId((prev) => (prev === id ? null : id));
-    if (activePatternId !== id) {
-      setEditingNotesId(null);
-      setEditNotesValue("");
-    }
-  };
-
-  const scrollToCard = (id) => {
-    requestAnimationFrame(() => {
-      const el = cardRefs.current[id];
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      }
-    });
-  };
-
-  useEffect(() => {
-    if (activePatternId) {
-      scrollToCard(activePatternId);
-    }
-  }, [activePatternId]);
-
-  const startEditNotes = (pattern) => {
-    setEditingNotesId(pattern.id);
-    setEditNotesValue(pattern.notes || "");
-  };
-
-  const cancelEditNotes = () => {
-    setEditingNotesId(null);
-    setEditNotesValue("");
-  };
-
   const saveNotes = async (pattern, notesValue) => {
-    const valueToSave = notesValue !== undefined ? notesValue : editNotesValue;
-    setSavingNotesId(pattern.id);
+    const valueToSave = notesValue ?? "";
     try {
       const isBuiltin = pattern.id.startsWith("builtin-");
       const payload = {
@@ -121,8 +74,6 @@ const PatternCheatSheet = () => {
           setPatterns((prev) =>
             prev.map((p) => (p.name === pattern.name ? updated : p))
           );
-          setEditingNotesId(null);
-          setEditNotesValue("");
           if (selectedPattern?.name === pattern.name) {
             setSelectedPattern(updated);
           }
@@ -140,7 +91,7 @@ const PatternCheatSheet = () => {
               Authorization: `Bearer ${token}`,
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ notes: editNotesValue }),
+            body: JSON.stringify({ notes: valueToSave }),
           }
         );
         if (response.ok) {
@@ -148,8 +99,6 @@ const PatternCheatSheet = () => {
           setPatterns((prev) =>
             prev.map((p) => (p.id === pattern.id ? updated : p))
           );
-          setEditingNotesId(null);
-          setEditNotesValue("");
           if (selectedPattern?.id === pattern.id) {
             setSelectedPattern(updated);
           }
@@ -161,8 +110,6 @@ const PatternCheatSheet = () => {
       }
     } catch (error) {
       toast.error("Failed to save notes");
-    } finally {
-      setSavingNotesId(null);
     }
   };
 
@@ -198,154 +145,28 @@ const PatternCheatSheet = () => {
 
       {/* Pattern Cards */}
       <div className="space-y-3">
-        {patterns.map((pattern) => {
-          const isExpanded = activePatternId === pattern.id;
-          return (
-            <div
-              key={pattern.id}
-              ref={(el) => (cardRefs.current[pattern.id] = el)}
-              className={cn(
-                "glass rounded-xl border transition-all duration-300 overflow-hidden card-interactive",
-                isExpanded
-                  ? "border-violet-500/30"
-                  : "border-zinc-800/50 hover:border-zinc-700"
-              )}
-            >
-              {/* Collapsed header - always visible */}
-              <div className="flex items-center justify-between p-5 gap-3">
-                <button
-                  type="button"
-                  onClick={() => toggleCard(pattern.id)}
-                  className="flex-1 flex items-center justify-between text-left min-w-0 focus:outline-none focus:ring-0"
-                  data-testid={`pattern-card-${pattern.id}`}
-                >
-                  <span className="font-heading font-semibold text-zinc-100 truncate">
-                    {pattern.name}
-                  </span>
-                  <ChevronDown
-                    size={20}
-                    className={cn(
-                      "text-zinc-500 transition-transform duration-200 flex-shrink-0 ml-2",
-                      isExpanded && "rotate-180"
-                    )}
-                  />
-                </button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSelectedPattern(pattern)}
-                  className="flex-shrink-0 border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
-                  data-testid={`view-desc-${pattern.id}`}
-                >
-                  <FileText size={14} className="mr-1.5" />
-                  View Description
-                </Button>
-              </div>
-
-              {/* Collapsible content - smooth height animation */}
-              <div
-                className={cn(
-                  "overflow-hidden transition-all duration-300 ease-in-out",
-                  isExpanded ? "max-h-[800px] opacity-100" : "max-h-0 opacity-0"
-                )}
+        {patterns.map((pattern) => (
+          <div
+            key={pattern.id}
+            className="glass rounded-xl border border-zinc-800/50 hover:border-zinc-700 transition-all card-interactive"
+          >
+            <div className="flex items-center justify-between p-5 gap-3">
+              <span className="font-heading font-semibold text-zinc-100 truncate" data-testid={`pattern-card-${pattern.id}`}>
+                {pattern.name}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSelectedPattern(pattern)}
+                className="flex-shrink-0 border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
+                data-testid={`view-desc-${pattern.id}`}
               >
-                <div>
-                  <div className="px-5 pb-5 pt-0 border-t border-zinc-800/50">
-                    <div className="space-y-4">
-                      {/* Description */}
-                      {pattern.description && (
-                        <div>
-                          <h4 className="text-xs font-mono uppercase tracking-wider text-zinc-500 mb-2">
-                            Description
-                          </h4>
-                          <p className="text-sm text-zinc-300 leading-relaxed">
-                            {pattern.description}
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Notes */}
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="text-xs font-mono uppercase tracking-wider text-zinc-500">
-                            Notes
-                          </h4>
-                          {editingNotesId !== pattern.id ? (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => startEditNotes(pattern)}
-                              className="text-zinc-400 hover:text-zinc-100 h-8"
-                            >
-                              <Pencil size={14} className="mr-1" />
-                              Edit Notes
-                            </Button>
-                          ) : (
-                            <div className="flex gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={cancelEditNotes}
-                                className="text-zinc-400 hover:text-zinc-100 h-8"
-                              >
-                                Cancel
-                              </Button>
-                              <Button
-                                size="sm"
-                                onClick={() => saveNotes(pattern, editNotesValue)}
-                                disabled={savingNotesId === pattern.id}
-                                className="bg-violet-600 hover:bg-violet-700 h-8"
-                              >
-                                {savingNotesId === pattern.id ? (
-                                  <span className="flex items-center gap-1">
-                                    <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    Saving...
-                                  </span>
-                                ) : (
-                                  <span className="flex items-center gap-1">
-                                    <Save size={14} />
-                                    Save
-                                  </span>
-                                )}
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                        {editingNotesId === pattern.id ? (
-                          <Textarea
-                            value={editNotesValue}
-                            onChange={(e) => setEditNotesValue(e.target.value)}
-                            placeholder="Add your notes..."
-                            rows={4}
-                            className="bg-zinc-950/50 border-zinc-800 text-zinc-100 placeholder:text-zinc-600 focus:border-violet-500 focus:ring-violet-500/20 resize-none"
-                          />
-                        ) : (
-                          <p className="text-sm text-zinc-400 min-h-[2rem]">
-                            {pattern.notes || "No notes yet. Click Edit Notes to add."}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Tags */}
-                      {pattern.tags && pattern.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-2">
-                          {pattern.tags.map((tag) => (
-                            <span
-                              key={tag}
-                              className="px-2 py-0.5 rounded text-xs font-mono bg-violet-500/10 text-violet-400 border border-violet-500/20"
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
+                <FileText size={14} className="mr-1.5" />
+                View Description
+              </Button>
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
 
       {patterns.length === 0 && (
