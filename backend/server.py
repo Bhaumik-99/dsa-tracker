@@ -510,6 +510,164 @@ async def get_analytics(
 async def get_patterns():
     return {"patterns": DSA_PATTERNS}
 
+
+# ==================== PATTERN CHEAT SHEET ====================
+
+class PatternCheatCreate(BaseModel):
+    name: str = Field(min_length=1)
+    description: str = Field(min_length=1)
+    notes: Optional[str] = ""
+    tags: Optional[List[str]] = []
+
+class PatternCheatUpdate(BaseModel):
+    description: Optional[str] = None
+    notes: Optional[str] = None
+    tags: Optional[List[str]] = None
+
+class PatternCheatUpsert(BaseModel):
+    name: str = Field(min_length=1)
+    description: Optional[str] = ""
+    notes: Optional[str] = ""
+    tags: Optional[List[str]] = []
+
+
+@api_router.get("/pattern-cheats")
+async def get_pattern_cheats(current_user: dict = Depends(get_current_user)):
+    """Returns merged list: DSA_PATTERNS (with user overrides) + user's custom patterns."""
+    user_cheats = await db.pattern_cheats.find(
+        {"user_id": current_user["id"]},
+        {"_id": 0}
+    ).to_list(500)
+    
+    by_name = {p["name"]: p for p in user_cheats}
+    result = []
+    
+    # Built-in patterns first
+    for name in DSA_PATTERNS:
+        if name in by_name:
+            result.append(by_name[name])
+        else:
+            result.append({
+                "id": f"builtin-{name}",
+                "user_id": current_user["id"],
+                "name": name,
+                "description": "",
+                "notes": "",
+                "tags": [],
+                "is_builtin": True,
+            })
+    
+    # User's custom patterns
+    for p in user_cheats:
+        if p["name"] not in DSA_PATTERNS:
+            result.append({**p, "is_builtin": False})
+    
+    return result
+
+
+@api_router.post("/pattern-cheats", response_model=dict)
+async def create_pattern_cheat(
+    data: PatternCheatCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Add a custom pattern (name must not be in DSA_PATTERNS)."""
+    if data.name in DSA_PATTERNS:
+        raise HTTPException(
+            status_code=400,
+            detail="Use the existing built-in pattern and add notes via the cheat sheet"
+        )
+    
+    existing = await db.pattern_cheats.find_one(
+        {"user_id": current_user["id"], "name": data.name}
+    )
+    if existing:
+        raise HTTPException(status_code=400, detail="Pattern with this name already exists")
+    
+    pattern_id = str(uuid.uuid4())
+    doc = {
+        "id": pattern_id,
+        "user_id": current_user["id"],
+        "name": data.name,
+        "description": data.description,
+        "notes": data.notes or "",
+        "tags": data.tags or [],
+        "is_builtin": False,
+    }
+    await db.pattern_cheats.insert_one(doc)
+    return {**doc, "_id": None}
+
+
+@api_router.put("/pattern-cheats/upsert", response_model=dict)
+async def upsert_pattern_cheat(
+    data: PatternCheatUpsert,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create or update pattern notes (for built-in or custom)."""
+    existing = await db.pattern_cheats.find_one(
+        {"user_id": current_user["id"], "name": data.name},
+        {"_id": 0}
+    )
+    
+    updates = {
+        "description": data.description or "",
+        "notes": data.notes or "",
+        "tags": data.tags or [],
+    }
+    
+    if existing:
+        await db.pattern_cheats.update_one(
+            {"id": existing["id"]},
+            {"$set": updates}
+        )
+        return {**existing, **updates}
+    
+    # Create new (for built-in pattern when user first adds notes)
+    pattern_id = str(uuid.uuid4())
+    doc = {
+        "id": pattern_id,
+        "user_id": current_user["id"],
+        "name": data.name,
+        "description": updates["description"],
+        "notes": updates["notes"],
+        "tags": updates["tags"],
+        "is_builtin": data.name in DSA_PATTERNS,
+    }
+    await db.pattern_cheats.insert_one(doc)
+    return {**doc, "_id": None}
+
+
+@api_router.patch("/pattern-cheats/{pattern_id}")
+async def update_pattern_cheat(
+    pattern_id: str,
+    data: PatternCheatUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update pattern by id."""
+    pattern = await db.pattern_cheats.find_one(
+        {"id": pattern_id, "user_id": current_user["id"]},
+        {"_id": 0}
+    )
+    
+    if not pattern:
+        raise HTTPException(status_code=404, detail="Pattern not found")
+    
+    updates = {}
+    if data.description is not None:
+        updates["description"] = data.description
+    if data.notes is not None:
+        updates["notes"] = data.notes
+    if data.tags is not None:
+        updates["tags"] = data.tags
+    
+    if updates:
+        await db.pattern_cheats.update_one(
+            {"id": pattern_id},
+            {"$set": updates}
+        )
+    
+    return {"message": "Updated", "id": pattern_id}
+
+
 # ==================== HEALTH CHECK ====================
 
 @api_router.get("/health")

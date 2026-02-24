@@ -8,6 +8,7 @@ import Dashboard from "./pages/Dashboard";
 import AddProblem from "./pages/AddProblem";
 import Problems from "./pages/Problems";
 import Analytics from "./pages/Analytics";
+import PatternCheatSheet from "./pages/PatternCheatSheet";
 import "./App.css";
 
 const ProtectedRoute = ({ children }) => {
@@ -57,6 +58,7 @@ function App() {
           <Route path="/add" element={<ProtectedRoute><AddProblem /></ProtectedRoute>} />
           <Route path="/problems" element={<ProtectedRoute><Problems /></ProtectedRoute>} />
           <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
+          <Route path="/pattern-cheat-sheet" element={<ProtectedRoute><PatternCheatSheet /></ProtectedRoute>} />
         </Routes>
       </BrowserRouter>
       <Toaster position="top-right" theme="dark" />

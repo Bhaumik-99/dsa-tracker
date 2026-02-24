@@ -8,7 +8,8 @@ import {
   LogOut,
   Flame,
   Menu,
-  X
+  X,
+  BookMarked
 } from "lucide-react";
 import { useState } from "react";
 
@@ -16,6 +17,7 @@ const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
   { path: "/add", label: "Add Problem", icon: PlusCircle },
   { path: "/problems", label: "Problems", icon: BookOpen },
+  { path: "/pattern-cheat-sheet", label: "Pattern Cheat Sheet", icon: BookMarked },
   { path: "/analytics", label: "Analytics", icon: BarChart3 },
 ];
 
