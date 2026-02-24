@@ -80,15 +80,17 @@ const PatternDescriptionModal = ({ pattern, isOpen, onClose, token, onSaveNotes 
         {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto px-6 py-4 min-h-0">
           <div className="space-y-5">
-            {/* Description */}
-            <div>
-              <h4 className="text-xs font-mono uppercase tracking-wider text-zinc-500 mb-2">
-                Description
-              </h4>
-              <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap">
-                {pattern.description || "No description available."}
-              </p>
-            </div>
+            {/* Description - only show when available */}
+            {pattern.description && (
+              <div>
+                <h4 className="text-xs font-mono uppercase tracking-wider text-zinc-500 mb-2">
+                  Description
+                </h4>
+                <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap">
+                  {pattern.description}
+                </p>
+              </div>
+            )}
 
             {/* Notes */}
             <div>

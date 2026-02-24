@@ -159,10 +159,10 @@ const PatternCheatSheet = () => {
                 size="sm"
                 onClick={() => setSelectedPattern(pattern)}
                 className="flex-shrink-0 border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
-                data-testid={`view-desc-${pattern.id}`}
+                data-testid={`view-notes-${pattern.id}`}
               >
                 <FileText size={14} className="mr-1.5" />
-                View Description
+                  View Notes
               </Button>
             </div>
           </div>
