@@ -8,7 +8,8 @@ import {
   Trophy,
   Clock,
   BookOpen,
-  X
+  X,
+  RotateCcw
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -49,6 +50,7 @@ const Problems = () => {
   const [problems, setProblems] = useState([]);
   const [patterns, setPatterns] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [revisingAgainId, setRevisingAgainId] = useState(null);
   const [filters, setFilters] = useState({
     search: "",
     pattern: "",
@@ -106,6 +108,40 @@ const Problems = () => {
   };
 
   const hasActiveFilters = filters.pattern || filters.difficulty || filters.status;
+
+  const reviseAgain = async (problemId) => {
+    setRevisingAgainId(problemId);
+    try {
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const response = await fetch(`${API_URL}/api/problems/${problemId}/revise-again`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ timezone_str: timezone }),
+      });
+
+      if (response.ok) {
+        toast.success("Revision restarted from Day 3");
+        // Update just this problem in-place (avoid refetch + keep scroll)
+        setProblems((prev) =>
+          prev.map((p) =>
+            p.id === problemId
+              ? { ...p, status: "learning", completed_revisions: ["day1"] }
+              : p
+          )
+        );
+      } else {
+        const err = await response.json();
+        toast.error(err.detail || "Failed to restart revision");
+      }
+    } catch (error) {
+      toast.error("Failed to restart revision");
+    } finally {
+      setRevisingAgainId(null);
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in" data-testid="problems-page">
@@ -293,7 +329,19 @@ const Problems = () => {
                     </div>
 
                     {/* Actions */}
-                    <div className="col-span-1 flex justify-end">
+                    <div className="col-span-1 flex justify-end gap-2">
+                      {problem.status === "mastered" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => reviseAgain(problem.id)}
+                          disabled={revisingAgainId === problem.id}
+                          data-testid={`revise-again-${problem.id}`}
+                          className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
+                        >
+                          <RotateCcw size={16} />
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"

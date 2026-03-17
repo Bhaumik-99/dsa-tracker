@@ -109,6 +109,9 @@ class RevisionUpdate(BaseModel):
     completed_at: Optional[str] = None
     timezone_str: Optional[str] = "UTC"
 
+class RestartRevision(BaseModel):
+    timezone_str: Optional[str] = "UTC"
+
 # ==================== AUTH HELPERS ====================
 
 def hash_password(password: str) -> str:
@@ -436,6 +439,54 @@ async def mark_revision_complete(
         )
     
     return {"message": "Revision marked complete", "status": new_status}
+
+
+@api_router.patch("/problems/{problem_id}/revise-again")
+async def revise_again_from_day3(
+    problem_id: str,
+    data: RestartRevision,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Restart revisions for a problem (unlimited times).
+    Rule: restart from day3 (day1 treated as completed), next pending stage is day3.
+    """
+    problem = await db.problems.find_one(
+        {"id": problem_id, "user_id": current_user["id"]},
+        {"_id": 0}
+    )
+
+    if not problem:
+        raise HTTPException(status_code=404, detail="Problem not found")
+
+    # Use user's timezone to anchor "now" consistently
+    try:
+        user_tz = ZoneInfo(data.timezone_str) if data.timezone_str else ZoneInfo("UTC")
+    except Exception:
+        user_tz = ZoneInfo("UTC")
+
+    now_user = datetime.now(user_tz)
+    now_utc = now_user.astimezone(timezone.utc)
+
+    # Set day3 to now, and future gaps consistent with mark_revision_complete(day3)
+    new_revision_dates = {
+        "day1": problem["revision_dates"].get("day1") if problem.get("revision_dates") else datetime.now(timezone.utc).isoformat(),
+        "day3": now_utc.isoformat(),
+        "day7": (now_utc + timedelta(days=4)).isoformat(),
+        "day14": (now_utc + timedelta(days=11)).isoformat(),
+        "day30": (now_utc + timedelta(days=27)).isoformat(),
+    }
+
+    await db.problems.update_one(
+        {"id": problem_id},
+        {"$set": {
+            "status": "learning",
+            "completed_revisions": ["day1"],
+            "revision_dates": new_revision_dates
+        }}
+    )
+
+    return {"message": "Revision restarted from day3", "status": "learning"}
 
 @api_router.get("/analytics")
 async def get_analytics(
